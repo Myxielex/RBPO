@@ -1,0 +1,1243 @@
+{
+  "info": {
+    "name": "Recycling — LR3: бизнес-операции и CRUD",
+    "description": "Сначала запустите папку «Основной сценарий» сверху вниз. CRUD-примеры предназначены для выборочного запуска и показывают CRUD-маршруты всех пяти сущностей.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "today",
+      "value": "2026-10-17"
+    },
+    {
+      "key": "runSuffix",
+      "value": "run1"
+    },
+    {
+      "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "typeId",
+      "value": "1"
+    },
+    {
+      "key": "point1Id",
+      "value": "1"
+    },
+    {
+      "key": "point2Id",
+      "value": "2"
+    },
+    {
+      "key": "batch1Id",
+      "value": "1"
+    },
+    {
+      "key": "batch2Id",
+      "value": "2"
+    },
+    {
+      "key": "bonusId",
+      "value": "1"
+    },
+    {
+      "key": "authUsername",
+      "value": "admin"
+    },
+    {
+      "key": "authPassword",
+      "value": "ChangeMe123"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.collectionVariables.set(\"today\", new Date().toISOString().slice(0, 10));",
+          "pm.collectionVariables.set(\"runSuffix\", Date.now().toString());",
+          "pm.sendRequest({ url: pm.collectionVariables.get(\"baseUrl\") + \"/api/csrf-token\", method: \"GET\" }, function (error, response) {",
+          "    if (!error && response.code === 200) {",
+          "        const tokenData = response.json();",
+          "        pm.collectionVariables.set(\"csrfHeaderName\", tokenData.headerName);",
+          "        pm.collectionVariables.set(\"csrfToken\", tokenData.token);",
+          "        pm.request.headers.upsert({ key: tokenData.headerName, value: tokenData.token });",
+          "    }",
+          "});"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Аутентификация и CSRF",
+      "description": "Сначала получите CSRF-токен и зарегистрируйте пользователя. После регистрации выполните в MySQL Workbench: UPDATE users SET role = 'ADMIN' WHERE username = 'admin'; затем используйте authUsername=admin и authPassword=ChangeMe123 для административных запросов. Для обычного пользователя используйте его логин и пароль.",
+      "item": [
+        {
+          "name": "Получить CSRF-токен",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/csrf-token"
+            }
+          }
+        },
+        {
+          "name": "Зарегистрировать пользователя",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Администратор\",\n  \"username\": \"admin\",\n  \"password\": \"ChangeMe123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Основной сценарий (запускать сверху вниз)",
+      "description": "Создаёт тестовые записи и демонстрирует регистрацию, перенос, подтверждение с начислением, отмену с аннулированием и отклонение.",
+      "item": [
+        {
+          "name": "1. Создать пользователя",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Иван\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"создан пользователь\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json(); pm.collectionVariables.set(\"userId\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Создать тип вторсырья",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-types"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Пластик {{runSuffix}}\",\n  \"unit\": \"кг\",\n  \"pointsPerKg\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"создан тип вторсырья\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json(); pm.collectionVariables.set(\"typeId\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Создать пункт приёма №1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/collection-points"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"ул. Ленина, 10 {{runSuffix}}\",\n  \"acceptedTypes\": [\n    {\n      \"id\": {{typeId}}\n    }\n  ],\n  \"availability\": true,\n  \"dailyMassLimit\": 100.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"создан первый пункт\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json(); pm.collectionVariables.set(\"point1Id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Создать пункт приёма №2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/collection-points"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"ул. Мира, 5 {{runSuffix}}\",\n  \"acceptedTypes\": [\n    {\n      \"id\": {{typeId}}\n    }\n  ],\n  \"availability\": true,\n  \"dailyMassLimit\": 100.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"создан второй пункт\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json(); pm.collectionVariables.set(\"point2Id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Бизнес-операция: зарегистрировать партию",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/business/register"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"pointId\": {{point1Id}},\n  \"recyclingTypeId\": {{typeId}},\n  \"mass\": 5.0,\n  \"collectionDate\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"партия зарегистрирована\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json(); pm.collectionVariables.set(\"batch1Id\", body.id); pm.test(\"начальный статус ожидающий\", function () { pm.expect(body.status).to.eql(\"Ожидает\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Бизнес-операция: перенести партию",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{batch1Id}}/transfer"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pointId\": {{point2Id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"партия перенесена\", function () { pm.response.to.have.status(200); });",
+                  "pm.expect(pm.response.json().point.id.toString()).to.eql(pm.collectionVariables.get(\"point2Id\").toString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Бизнес-операция: подтвердить приём",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{batch1Id}}/confirm"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"партия подтверждена\", function () { pm.response.to.have.status(200); });",
+                  "pm.expect(pm.response.json().status).to.eql(\"Принята\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Проверить начисление баллов",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bonus-entries"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"список начислений доступен\", function () { pm.response.to.have.status(200); });",
+                  "const batchId = pm.collectionVariables.get(\"batch1Id\").toString();",
+                  "const entry = pm.response.json().find(x => x.batch && x.batch.id.toString() === batchId);",
+                  "pm.test(\"начисление найдено\", function () { pm.expect(entry).to.exist; });",
+                  "pm.expect(entry.points).to.eql(60); pm.expect(entry.status).to.eql(\"Начислено\");",
+                  "pm.collectionVariables.set(\"bonusId\", entry.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Бизнес-операция: отменить принятую партию",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{batch1Id}}/cancel"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"партия отменена\", function () { pm.response.to.have.status(200); });",
+                  "pm.expect(pm.response.json().status).to.eql(\"Отменена\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Проверить аннулирование начисления",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bonus-entries/{{bonusId}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"запись начисления доступна\", function () { pm.response.to.have.status(200); });",
+                  "pm.expect(pm.response.json().status).to.eql(\"Аннулировано\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Зарегистрировать вторую партию",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/business/register"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"pointId\": {{point2Id}},\n  \"recyclingTypeId\": {{typeId}},\n  \"mass\": 2.0,\n  \"collectionDate\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"вторая партия зарегистрирована\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json(); pm.collectionVariables.set(\"batch2Id\", body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Бизнес-операция: отклонить вторую партию",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{batch2Id}}/reject"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"партия отклонена\", function () { pm.response.to.have.status(200); });",
+                  "pm.expect(pm.response.json().status).to.eql(\"Отклонена\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13. Проверить вторую партию",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{batch2Id}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"статус второй партии сохранён\", function () { pm.response.to.have.status(200); });",
+                  "pm.expect(pm.response.json().status).to.eql(\"Отклонена\");"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Проверки ограничений (запускать после основного сценария)",
+      "description": "Эти запросы должны завершаться HTTP 409: повторная операция, изменение отменённой партии и превышение лимита.",
+      "item": [
+        {
+          "name": "Повторное подтверждение отменённой партии — ожидается 409",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{batch1Id}}/confirm"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"нельзя повторно подтвердить отменённую партию\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Повторное отклонение — ожидается 409",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{batch2Id}}/reject"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"нельзя повторно отклонить партию\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Перенос отменённой партии — ожидается 409",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{batch1Id}}/transfer"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pointId\": {{point1Id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"нельзя переносить отменённую партию\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Масса выше дневного лимита — ожидается 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/business/register"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"pointId\": {{point2Id}},\n  \"recyclingTypeId\": {{typeId}},\n  \"mass\": 101.0,\n  \"collectionDate\": \"{{today}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"дневной лимит проверяется\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CRUD — пользователи",
+      "item": [
+        {
+          "name": "GET — список пользователей",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users"
+            }
+          }
+        },
+        {
+          "name": "GET — пользователь по id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}"
+            }
+          }
+        },
+        {
+          "name": "POST — создать тестового пользователя",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Тестовый пользователь {{runSuffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"создано\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"crudUserId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH — изменить тестового пользователя",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{crudUserId}}"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Обновлённый пользователь\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"обновлено\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE — удалить тестового пользователя",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{crudUserId}}"
+            },
+            "description": "Удаляйте только пользователя, у которого нет партий сдачи."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"удаление выполнено\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CRUD — типы вторсырья",
+      "item": [
+        {
+          "name": "GET — список типов",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-types"
+            }
+          }
+        },
+        {
+          "name": "GET — тип по id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-types/{{typeId}}"
+            }
+          }
+        },
+        {
+          "name": "POST — создать тестовый тип",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-types"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Бумага {{runSuffix}}\",\n  \"unit\": \"кг\",\n  \"pointsPerKg\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"создано\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"crudTypeId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH — изменить тестовый тип",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-types/{{crudTypeId}}"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Картон {{runSuffix}}\",\n  \"unit\": \"кг\",\n  \"pointsPerKg\": 6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"обновлено\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE — удалить тестовый тип",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-types/{{crudTypeId}}"
+            },
+            "description": "Удаляйте тип только если он не привязан к пунктам приёма и партиям."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"удаление выполнено\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CRUD — пункты приёма",
+      "item": [
+        {
+          "name": "GET — список пунктов",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/collection-points"
+            }
+          }
+        },
+        {
+          "name": "GET — пункт по id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/collection-points/{{point1Id}}"
+            }
+          }
+        },
+        {
+          "name": "POST — создать тестовый пункт",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/collection-points"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"Тестовый адрес {{runSuffix}}\",\n  \"acceptedTypes\": [\n    {\n      \"id\": {{typeId}}\n    }\n  ],\n  \"availability\": true,\n  \"dailyMassLimit\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"создано\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"crudPointId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH — изменить тестовый пункт",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/collection-points/{{crudPointId}}"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"Новый тестовый адрес {{runSuffix}}\",\n  \"acceptedTypes\": [\n    {\n      \"id\": {{typeId}}\n    }\n  ],\n  \"availability\": true,\n  \"dailyMassLimit\": 70\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"обновлено\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE — удалить тестовый пункт",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/collection-points/{{crudPointId}}"
+            },
+            "description": "Удаляйте только пункт, к которому не привязаны партии."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"удаление выполнено\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CRUD — партии сдачи",
+      "item": [
+        {
+          "name": "GET — список партий",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches"
+            }
+          }
+        },
+        {
+          "name": "GET — партия по id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{batch2Id}}"
+            }
+          }
+        },
+        {
+          "name": "POST — создать тестовую партию",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": {\n    \"id\": {{userId}}\n  },\n  \"point\": {\n    \"id\": {{point1Id}}\n  },\n  \"recyclingType\": {\n    \"id\": {{typeId}}\n  },\n  \"mass\": 1.5,\n  \"collectionDate\": \"{{today}}\",\n  \"status\": \"Ожидает\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"создано\", function () { pm.response.to.have.status(201); });",
+                  "pm.collectionVariables.set(\"crudBatchId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH — изменить ожидающую партию",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{crudBatchId}}"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": {\n    \"id\": {{userId}}\n  },\n  \"point\": {\n    \"id\": {{point1Id}}\n  },\n  \"recyclingType\": {\n    \"id\": {{typeId}}\n  },\n  \"mass\": 2.0,\n  \"collectionDate\": \"{{today}}\",\n  \"status\": \"Ожидает\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"обновлено\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE — удалить ожидающую партию",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/recycling-batches/{{crudBatchId}}"
+            },
+            "description": "Можно удалить только партию без начисления; принятую партию удалять нельзя."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"удаление выполнено\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CRUD — записи начислений",
+      "item": [
+        {
+          "name": "GET — список начислений",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bonus-entries"
+            }
+          }
+        },
+        {
+          "name": "GET — начисление по id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bonus-entries/{{bonusId}}"
+            }
+          }
+        },
+        {
+          "name": "POST — нельзя повторно начислить баллы отменённой партии",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bonus-entries"
+            },
+            "description": "Заполните bonusCandidateBatchId id принятой партии, у которой ещё нет записи о начислении. Баллы и статус сервер пересчитает сам. Обычно начисление создаётся через POST /api/recycling-batches/{id}/confirm.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"batch\": {\n    \"id\": {{batch1Id}}\n  },\n  \"points\": 1,\n  \"status\": \"Начислено\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"нельзя начислить баллы за отменённую партию\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH — нельзя изменить аннулированное начисление",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bonus-entries/{{bonusId}}"
+            },
+            "description": "Вручную задаваемые points и status не применяются. Требуется активная запись для принятой партии; сервис пересчитает points по текущему тарифу.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"batch\": {\n    \"id\": {{batch1Id}}\n  },\n  \"points\": 1,\n  \"status\": \"Начислено\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"аннулированное начисление нельзя редактировать\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE — удалить неактивную запись начисления",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bonus-entries/{{bonusId}}"
+            },
+            "description": "Удаляются только неактивные/аннулированные записи. Действующее начисление следует отменять через бизнес-операцию отмены партии."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"аннулированное начисление можно удалить\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "username",
+        "value": "{{authUsername}}",
+        "type": "string"
+      },
+      {
+        "key": "password",
+        "value": "{{authPassword}}",
+        "type": "string"
+      }
+    ]
+  }
+}
